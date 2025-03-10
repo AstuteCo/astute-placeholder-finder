@@ -57,6 +57,20 @@ class Placeholder_Content_Finder {
             .placeholder-indicator.image {
                 background-color: #2ea2cc;
             }
+            .filter-options {
+                margin: 15px 0;
+                padding: 15px;
+                background: #fff;
+                border: 1px solid #ccd0d4;
+                box-shadow: 0 1px 1px rgba(0,0,0,.04);
+            }
+            .filter-options h3 {
+                margin-top: 0;
+            }
+            .filter-options .filter-item {
+                display: inline-block;
+                margin-right: 20px;
+            }
         </style>';
     }
 
@@ -66,8 +80,33 @@ class Placeholder_Content_Finder {
             return;
         }
 
+        // Get filter options
+        $filter_options = array(
+            'lorem_ipsum' => isset($_POST['filter_lorem_ipsum']),
+            'placeholder_link' => isset($_POST['filter_placeholder_link']),
+            'placeholder_phone' => isset($_POST['filter_placeholder_phone']),
+            'youtube_url' => isset($_POST['filter_youtube_url']),
+            'placeholder_image' => isset($_POST['filter_placeholder_image'])
+        );
+        
+        // Check if any filter is active
+        $is_filtered = in_array(true, $filter_options);
+        
         // Process search if form is submitted
         $results = isset($_POST['find_placeholders']) ? $this->find_placeholders() : null;
+        
+        // Apply filters if needed
+        if ($results && $is_filtered) {
+            $results = array_filter($results, function($page) use ($filter_options) {
+                foreach ($filter_options as $type => $is_active) {
+                    if ($is_active && $page['placeholder_types'][$type]) {
+                        return true;
+                    }
+                }
+                // If we're filtering and none of the active filters match, exclude this page
+                return false;
+            });
+        }
 
         ?>
         <div class="wrap">
@@ -79,16 +118,76 @@ class Placeholder_Content_Finder {
             
             <form method="post" action="">
                 <?php wp_nonce_field('placeholder_finder_action', 'placeholder_finder_nonce'); ?>
+                
+                <div class="filter-options">
+                    <h3>Filter by Placeholder Type</h3>
+                    <p>Select which types of placeholders to search for:</p>
+                    
+                    <div class="filter-item">
+                        <label>
+                            <input type="checkbox" name="filter_lorem_ipsum" value="1" 
+                                <?php checked(isset($_POST['filter_lorem_ipsum'])); ?>>
+                            Lorem Ipsum
+                        </label>
+                    </div>
+                    
+                    <div class="filter-item">
+                        <label>
+                            <input type="checkbox" name="filter_placeholder_link" value="1"
+                                <?php checked(isset($_POST['filter_placeholder_link'])); ?>>
+                            Placeholder Links
+                        </label>
+                    </div>
+                    
+                    <div class="filter-item">
+                        <label>
+                            <input type="checkbox" name="filter_placeholder_phone" value="1"
+                                <?php checked(isset($_POST['filter_placeholder_phone'])); ?>>
+                            Phone Numbers (000.000.0000)
+                        </label>
+                    </div>
+                    
+                    <div class="filter-item">
+                        <label>
+                            <input type="checkbox" name="filter_youtube_url" value="1"
+                                <?php checked(isset($_POST['filter_youtube_url'])); ?>>
+                            YouTube URLs
+                        </label>
+                    </div>
+                    
+                    <div class="filter-item">
+                        <label>
+                            <input type="checkbox" name="filter_placeholder_image" value="1"
+                                <?php checked(isset($_POST['filter_placeholder_image'])); ?>>
+                            Placeholder Images
+                        </label>
+                    </div>
+                    
+                    <p class="description">
+                        <?php if ($is_filtered): ?>
+                            <em>Showing only pages with selected placeholder types. </em>
+                        <?php else: ?>
+                            <em>If no types are selected, all placeholder types will be searched.</em>
+                        <?php endif; ?>
+                    </p>
+                </div>
+                
                 <input type="submit" name="find_placeholders" value="Find Placeholder Content" class="button button-primary">
             </form>
 
-            <?php if ($results): ?>
+            <?php if ($results !== null): ?>
                 <div class="placeholder-results">
                     <h2>Pages with Placeholder Content</h2>
                     
                     <?php if (empty($results)): ?>
                         <div class="notice notice-success">
-                            <p>No placeholder content found!</p>
+                            <p>
+                                <?php if ($is_filtered): ?>
+                                    No pages found with the selected placeholder types.
+                                <?php else: ?>
+                                    No placeholder content found!
+                                <?php endif; ?>
+                            </p>
                         </div>
                     <?php else: ?>
                         <p>Found <?php echo count($results); ?> pages with placeholder content.</p>
