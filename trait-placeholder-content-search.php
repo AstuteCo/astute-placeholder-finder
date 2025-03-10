@@ -7,16 +7,10 @@ if (!defined('ABSPATH')) {
 trait Placeholder_Content_Search {
     public function find_placeholders() {
         global $wpdb;
-        $results = array(
-            'posts' => array(),
-            'blocks' => array(),
-            'postmeta' => array(),
-            'acf' => array(),
-            'phone_numbers' => array(), // Added for phone numbers
-            'youtube_urls' => array(),  // Added for YouTube URLs
-            'placeholder_images' => array(), // Added for placeholder images
-        );
-
+        
+        // Initialize the results structure to track pages with placeholders
+        $results = array();
+        
         // Get all posts, excluding revisions
         $posts_query = new WP_Query(array(
             'posts_per_page' => -1,
@@ -31,13 +25,52 @@ trait Placeholder_Content_Search {
             $post_title = get_the_title();
             $post_content = get_the_content();
             $post_status = get_post_status();
+            $post_type = get_post_type();
+            $edit_link = get_edit_post_link($post_id);
 
             // Skip revisions (additional check)
-            if (get_post_type() === 'revision') {
+            if ($post_type === 'revision') {
                 continue;
             }
-
-            // Search in Gutenberg blocks
+            
+            // Initialize placeholder types for this page
+            $placeholder_types = array(
+                'lorem_ipsum' => false,
+                'placeholder_link' => false,
+                'placeholder_phone' => false,
+                'youtube_url' => false,
+                'placeholder_image' => false
+            );
+            
+            // Check post content for placeholders
+            // Look for Lorem Ipsum
+            if (preg_match('/\blorem ipsum\b/i', $post_content)) {
+                $placeholder_types['lorem_ipsum'] = true;
+            }
+            
+            // Look for placeholder links
+            if (strpos($post_content, 'href="#"') !== false) {
+                $placeholder_types['placeholder_link'] = true;
+            }
+            
+            // Look for specific phone number format: 000.000.0000
+            if (preg_match('/\b000\.000\.0000\b/', $post_content) || 
+                preg_match('/\b000\-000\-0000\b/', $post_content) || 
+                preg_match('/\b\(000\)[\s\.\-]?000[\.\-]?0000\b/', $post_content)) {
+                $placeholder_types['placeholder_phone'] = true;
+            }
+            
+            // Look for YouTube URLs 
+            if (preg_match('/(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+/', $post_content)) {
+                $placeholder_types['youtube_url'] = true;
+            }
+            
+            // Look for images with "placeholder" in the filename
+            if (preg_match('/<img[^>]+src=[\'"][^\'"]*placeholder[^\'"]*[\'"][^>]*>/i', $post_content)) {
+                $placeholder_types['placeholder_image'] = true;
+            }
+            
+            // Check Gutenberg blocks if present
             if (has_blocks($post_content)) {
                 $blocks = parse_blocks($post_content);
                 
@@ -47,318 +80,120 @@ trait Placeholder_Content_Search {
                         ? implode(' ', array_filter($block['innerContent'])) 
                         : (string)$block['innerContent'];
                     
-                    // Search for Lorem Ipsum in block
+                    // Check for placeholders in blocks
                     if (preg_match('/\blorem ipsum\b/i', $block_content)) {
-                        $results['blocks'][] = array(
-                            'post_id' => $post_id,
-                            'post_title' => $post_title,
-                            'post_status' => $post_status,
-                            'block_type' => $block['blockName'] ?: 'Unknown Block',
-                            'type' => 'Lorem Ipsum'
-                        );
+                        $placeholder_types['lorem_ipsum'] = true;
                     }
-
-                    // Search for placeholder links in block
+                    
                     if (strpos($block_content, 'href="#"') !== false) {
-                        $results['blocks'][] = array(
-                            'post_id' => $post_id,
-                            'post_title' => $post_title,
-                            'post_status' => $post_status,
-                            'block_type' => $block['blockName'] ?: 'Unknown Block',
-                            'type' => 'Placeholder Link'
-                        );
+                        $placeholder_types['placeholder_link'] = true;
                     }
                     
-                    // Search for placeholder phone numbers in block
-                    if (preg_match('/\b(\d{3}[\.\-\s]?\d{3}[\.\-\s]?\d{4}|\(\d{3}\)[\s\.\-]?\d{3}[\.\-\s]?\d{4})\b/', $block_content, $matches)) {
-                        $results['phone_numbers'][] = array(
-                            'post_id' => $post_id,
-                            'post_title' => $post_title,
-                            'post_status' => $post_status,
-                            'location' => 'Block: ' . ($block['blockName'] ?: 'Unknown Block'),
-                            'number' => $matches[0],
-                            'type' => 'Placeholder Phone Number'
-                        );
+                    if (preg_match('/\b000\.000\.0000\b/', $block_content) || 
+                        preg_match('/\b000\-000\-0000\b/', $block_content) || 
+                        preg_match('/\b\(000\)[\s\.\-]?000[\.\-]?0000\b/', $block_content)) {
+                        $placeholder_types['placeholder_phone'] = true;
                     }
                     
-                    // Search for YouTube URLs in block
-                    if (preg_match_all('/(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+/', $block_content, $matches)) {
-                        foreach ($matches[0] as $youtube_url) {
-                            $results['youtube_urls'][] = array(
-                                'post_id' => $post_id,
-                                'post_title' => $post_title,
-                                'post_status' => $post_status,
-                                'location' => 'Block: ' . ($block['blockName'] ?: 'Unknown Block'),
-                                'url' => $youtube_url,
-                                'type' => 'YouTube URL'
-                            );
+                    if (preg_match('/(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+/', $block_content)) {
+                        $placeholder_types['youtube_url'] = true;
+                    }
+                    
+                    if (preg_match('/<img[^>]+src=[\'"][^\'"]*placeholder[^\'"]*[\'"][^>]*>/i', $block_content)) {
+                        $placeholder_types['placeholder_image'] = true;
+                    }
+                }
+            }
+            
+            // Check post meta for placeholders
+            $post_meta = get_post_meta($post_id);
+            if (!empty($post_meta)) {
+                foreach ($post_meta as $meta_key => $meta_values) {
+                    foreach ($meta_values as $meta_value) {
+                        // Convert value to string for searching
+                        $string_value = is_serialized($meta_value) 
+                            ? wp_json_encode(maybe_unserialize($meta_value)) 
+                            : (string)$meta_value;
+                        
+                        // Check for placeholders in meta values
+                        if (preg_match('/\blorem ipsum\b/i', $string_value)) {
+                            $placeholder_types['lorem_ipsum'] = true;
+                        }
+                        
+                        if (strpos($string_value, 'href="#"') !== false) {
+                            $placeholder_types['placeholder_link'] = true;
+                        }
+                        
+                        if (preg_match('/\b000\.000\.0000\b/', $string_value) ||
+                            preg_match('/\b000\-000\-0000\b/', $string_value) ||
+                            preg_match('/\b\(000\)[\s\.\-]?000[\.\-]?0000\b/', $string_value)) {
+                            $placeholder_types['placeholder_phone'] = true;
+                        }
+                        
+                        if (preg_match('/(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+/', $string_value)) {
+                            $placeholder_types['youtube_url'] = true;
+                        }
+                        
+                        if (preg_match('/<img[^>]+src=[\'"][^\'"]*placeholder[^\'"]*[\'"][^>]*>/i', $string_value)) {
+                            $placeholder_types['placeholder_image'] = true;
                         }
                     }
-                    
-                    // Search for images with "placeholder" in the filename
-                    if (preg_match_all('/<img[^>]+src=[\'"]([^\'"]+placeholder[^\'"]+)[\'"][^>]*>/i', $block_content, $matches)) {
-                        foreach ($matches[1] as $image_src) {
-                            $results['placeholder_images'][] = array(
-                                'post_id' => $post_id,
-                                'post_title' => $post_title,
-                                'post_status' => $post_status,
-                                'location' => 'Block: ' . ($block['blockName'] ?: 'Unknown Block'),
-                                'src' => $image_src,
-                                'type' => 'Placeholder Image'
-                            );
-                        }
-                    }
-                }
-            }
-
-            // Search in post content and excerpt (legacy/non-block content)
-            // Check for Lorem Ipsum in content
-            if (preg_match('/\blorem ipsum\b/i', $post_content)) {
-                $results['posts'][] = array(
-                    'id' => $post_id,
-                    'title' => $post_title,
-                    'post_status' => $post_status,
-                    'type' => 'Lorem Ipsum',
-                    'details' => 'Found in post content'
-                );
-            }
-
-            // Check for placeholder links in content
-            if (strpos($post_content, 'href="#"') !== false) {
-                $results['posts'][] = array(
-                    'id' => $post_id,
-                    'title' => $post_title,
-                    'post_status' => $post_status,
-                    'type' => 'Placeholder Link',
-                    'details' => 'Found placeholder link href="#"'
-                );
-            }
-            
-            // Check for placeholder phone numbers in content
-            if (preg_match_all('/\b(\d{3}[\.\-\s]?\d{3}[\.\-\s]?\d{4}|\(\d{3}\)[\s\.\-]?\d{3}[\.\-\s]?\d{4})\b/', $post_content, $matches)) {
-                foreach ($matches[0] as $phone_number) {
-                    $results['phone_numbers'][] = array(
-                        'post_id' => $post_id,
-                        'post_title' => $post_title,
-                        'post_status' => $post_status,
-                        'location' => 'Post Content',
-                        'number' => $phone_number,
-                        'type' => 'Placeholder Phone Number'
-                    );
                 }
             }
             
-            // Check for YouTube URLs in content
-            if (preg_match_all('/(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+/', $post_content, $matches)) {
-                foreach ($matches[0] as $youtube_url) {
-                    $results['youtube_urls'][] = array(
-                        'post_id' => $post_id,
-                        'post_title' => $post_title,
-                        'post_status' => $post_status,
-                        'location' => 'Post Content',
-                        'url' => $youtube_url,
-                        'type' => 'YouTube URL'
-                    );
-                }
-            }
-            
-            // Check for images with "placeholder" in the filename
-            if (preg_match_all('/<img[^>]+src=[\'"]([^\'"]+placeholder[^\'"]+)[\'"][^>]*>/i', $post_content, $matches)) {
-                foreach ($matches[1] as $image_src) {
-                    $results['placeholder_images'][] = array(
-                        'post_id' => $post_id,
-                        'post_title' => $post_title,
-                        'post_status' => $post_status,
-                        'location' => 'Post Content',
-                        'src' => $image_src,
-                        'type' => 'Placeholder Image'
-                    );
-                }
-            }
-        }
-        wp_reset_postdata();
-
-        // Search in post meta, excluding meta from revisions
-        $meta_query = $wpdb->prepare(
-            "SELECT pm.post_id, p.post_title, p.post_status, pm.meta_key, pm.meta_value 
-             FROM {$wpdb->postmeta} pm 
-             JOIN {$wpdb->posts} p ON pm.post_id = p.ID 
-             WHERE p.post_type != 'revision' AND 
-             (pm.meta_value REGEXP %s OR pm.meta_value LIKE %s)",
-            '[[:<:]]lorem ipsum[[:>:]]',
-            '%href="#"%'
-        );
-        $meta_results = $wpdb->get_results($meta_query, ARRAY_A);
-
-        foreach ($meta_results as $meta) {
-            // Convert meta value to string
-            $string_value = is_serialized($meta['meta_value']) 
-                ? wp_json_encode(maybe_unserialize($meta['meta_value'])) 
-                : $meta['meta_value'];
-
-            // Check for Lorem Ipsum
-            if (preg_match('/\blorem ipsum\b/i', $string_value)) {
-                $results['postmeta'][] = array(
-                    'post_id' => $meta['post_id'],
-                    'post_title' => $meta['post_title'],
-                    'post_status' => $meta['post_status'],
-                    'meta_key' => $meta['meta_key'],
-                    'type' => 'Lorem Ipsum'
-                );
-            }
-
-            // Check for placeholder links
-            if (strpos($string_value, 'href="#"') !== false) {
-                $results['postmeta'][] = array(
-                    'post_id' => $meta['post_id'],
-                    'post_title' => $meta['post_title'],
-                    'post_status' => $meta['post_status'],
-                    'meta_key' => $meta['meta_key'],
-                    'type' => 'Placeholder Link'
-                );
-            }
-            
-            // Check for placeholder phone numbers in meta
-            if (preg_match_all('/\b(\d{3}[\.\-\s]?\d{3}[\.\-\s]?\d{4}|\(\d{3}\)[\s\.\-]?\d{3}[\.\-\s]?\d{4})\b/', $string_value, $matches)) {
-                foreach ($matches[0] as $phone_number) {
-                    $results['phone_numbers'][] = array(
-                        'post_id' => $meta['post_id'],
-                        'post_title' => $meta['post_title'],
-                        'post_status' => $meta['post_status'],
-                        'location' => 'Meta: ' . $meta['meta_key'],
-                        'number' => $phone_number,
-                        'type' => 'Placeholder Phone Number'
-                    );
-                }
-            }
-            
-            // Check for YouTube URLs in meta
-            if (preg_match_all('/(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+/', $string_value, $matches)) {
-                foreach ($matches[0] as $youtube_url) {
-                    $results['youtube_urls'][] = array(
-                        'post_id' => $meta['post_id'],
-                        'post_title' => $meta['post_title'],
-                        'post_status' => $meta['post_status'],
-                        'location' => 'Meta: ' . $meta['meta_key'],
-                        'url' => $youtube_url,
-                        'type' => 'YouTube URL'
-                    );
-                }
-            }
-            
-            // Check for images with "placeholder" in the filename
-            if (preg_match_all('/<img[^>]+src=[\'"]([^\'"]+placeholder[^\'"]+)[\'"][^>]*>/i', $string_value, $matches)) {
-                foreach ($matches[1] as $image_src) {
-                    $results['placeholder_images'][] = array(
-                        'post_id' => $meta['post_id'],
-                        'post_title' => $meta['post_title'],
-                        'post_status' => $meta['post_status'],
-                        'location' => 'Meta: ' . $meta['meta_key'],
-                        'src' => $image_src,
-                        'type' => 'Placeholder Image'
-                    );
-                }
-            }
-        }
-
-        // Check ACF fields if Advanced Custom Fields is active
-        if (function_exists('get_fields')) {
-            $acf_query = new WP_Query(array(
-                'posts_per_page' => -1,
-                'post_type' => 'any',
-                'post_status' => 'any',
-                'post__not_in' => wp_get_post_revisions(), // Exclude revisions
-            ));
-
-            while ($acf_query->have_posts()) {
-                $acf_query->the_post();
-                
-                // Skip revisions (additional check)
-                if (get_post_type() === 'revision') {
-                    continue;
-                }
-                
-                $fields = get_fields(get_the_ID());
-
-                if ($fields) {
-                    foreach ($fields as $field_name => $value) {
-                        // Skip if value is complex type or null
+            // Check ACF fields if available
+            if (function_exists('get_fields')) {
+                $acf_fields = get_fields($post_id);
+                if ($acf_fields) {
+                    foreach ($acf_fields as $field_name => $value) {
+                        // Skip complex types or null values
                         if ($value === null || is_array($value) || is_object($value)) {
                             continue;
                         }
-
+                        
                         // Convert to string for searching
                         $string_value = (string) $value;
-
-                        // Check for Lorem Ipsum in text values
+                        
+                        // Check for placeholders in ACF field values
                         if (preg_match('/\blorem ipsum\b/i', $string_value)) {
-                            $results['acf'][] = array(
-                                'post_id' => get_the_ID(),
-                                'post_title' => get_the_title(),
-                                'post_status' => get_post_status(),
-                                'field_name' => $field_name,
-                                'type' => 'Lorem Ipsum'
-                            );
+                            $placeholder_types['lorem_ipsum'] = true;
                         }
-
-                        // Check for placeholder links in text values
+                        
                         if (strpos($string_value, 'href="#"') !== false) {
-                            $results['acf'][] = array(
-                                'post_id' => get_the_ID(),
-                                'post_title' => get_the_title(),
-                                'post_status' => get_post_status(),
-                                'field_name' => $field_name,
-                                'type' => 'Placeholder Link'
-                            );
+                            $placeholder_types['placeholder_link'] = true;
                         }
                         
-                        // Check for placeholder phone numbers in ACF fields
-                        if (preg_match_all('/\b(\d{3}[\.\-\s]?\d{3}[\.\-\s]?\d{4}|\(\d{3}\)[\s\.\-]?\d{3}[\.\-\s]?\d{4})\b/', $string_value, $matches)) {
-                            foreach ($matches[0] as $phone_number) {
-                                $results['phone_numbers'][] = array(
-                                    'post_id' => get_the_ID(),
-                                    'post_title' => get_the_title(),
-                                    'post_status' => get_post_status(),
-                                    'location' => 'ACF: ' . $field_name,
-                                    'number' => $phone_number,
-                                    'type' => 'Placeholder Phone Number'
-                                );
-                            }
+                        if (preg_match('/\b000\.000\.0000\b/', $string_value) ||
+                            preg_match('/\b000\-000\-0000\b/', $string_value) ||
+                            preg_match('/\b\(000\)[\s\.\-]?000[\.\-]?0000\b/', $string_value)) {
+                            $placeholder_types['placeholder_phone'] = true;
                         }
                         
-                        // Check for YouTube URLs in ACF fields
-                        if (preg_match_all('/(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+/', $string_value, $matches)) {
-                            foreach ($matches[0] as $youtube_url) {
-                                $results['youtube_urls'][] = array(
-                                    'post_id' => get_the_ID(),
-                                    'post_title' => get_the_title(),
-                                    'post_status' => get_post_status(),
-                                    'location' => 'ACF: ' . $field_name,
-                                    'url' => $youtube_url,
-                                    'type' => 'YouTube URL'
-                                );
-                            }
+                        if (preg_match('/(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+/', $string_value)) {
+                            $placeholder_types['youtube_url'] = true;
                         }
                         
-                        // Check for images with "placeholder" in the filename
-                        if (preg_match_all('/<img[^>]+src=[\'"]([^\'"]+placeholder[^\'"]+)[\'"][^>]*>/i', $string_value, $matches)) {
-                            foreach ($matches[1] as $image_src) {
-                                $results['placeholder_images'][] = array(
-                                    'post_id' => get_the_ID(),
-                                    'post_title' => get_the_title(),
-                                    'post_status' => get_post_status(),
-                                    'location' => 'ACF: ' . $field_name,
-                                    'src' => $image_src,
-                                    'type' => 'Placeholder Image'
-                                );
-                            }
+                        if (preg_match('/<img[^>]+src=[\'"][^\'"]*placeholder[^\'"]*[\'"][^>]*>/i', $string_value)) {
+                            $placeholder_types['placeholder_image'] = true;
                         }
                     }
                 }
             }
-            wp_reset_postdata();
+            
+            // Add to results only if at least one placeholder type is found
+            if (in_array(true, $placeholder_types)) {
+                $results[] = array(
+                    'post_id' => $post_id,
+                    'post_title' => $post_title,
+                    'post_type' => $post_type,
+                    'post_status' => $post_status,
+                    'edit_link' => $edit_link,
+                    'placeholder_types' => $placeholder_types
+                );
+            }
         }
-
+        wp_reset_postdata();
+        
         return $results;
     }
 }
