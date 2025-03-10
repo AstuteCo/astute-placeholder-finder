@@ -52,6 +52,9 @@ class Placeholder_Content_Finder {
                     <?php $this->render_posts_table($results); ?>
                     <?php $this->render_postmeta_table($results); ?>
                     <?php $this->render_acf_table($results); ?>
+                    <?php $this->render_phone_numbers_table($results); ?>
+                    <?php $this->render_youtube_urls_table($results); ?>
+                    <?php $this->render_placeholder_images_table($results); ?>
                 </div>
             <?php endif; ?>
         </div>
@@ -191,6 +194,122 @@ class Placeholder_Content_Finder {
             </table>
         <?php else: ?>
             <p>No ACF fields with placeholder content found.</p>
+        <?php endif;
+    }
+    
+    // New method for phone numbers table
+    private function render_phone_numbers_table($results) {
+        if (!empty($results['phone_numbers'])): ?>
+            <h3>Placeholder Phone Numbers</h3>
+            <table class="wp-list-table widefat fixed striped">
+                <thead>
+                    <tr>
+                        <th>Post ID</th>
+                        <th>Post Title</th>
+                        <th>Post Status</th>
+                        <th>Location</th>
+                        <th>Phone Number</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($results['phone_numbers'] as $phone_result): ?>
+                        <tr>
+                            <td>
+                                <a href="<?php echo esc_url(get_edit_post_link($phone_result['post_id'])); ?>" 
+                                   target="_blank">
+                                    <?php echo esc_html($phone_result['post_id']); ?>
+                                </a>
+                            </td>
+                            <td><?php echo esc_html($phone_result['post_title']); ?></td>
+                            <td><?php echo esc_html($phone_result['post_status']); ?></td>
+                            <td><?php echo esc_html($phone_result['location']); ?></td>
+                            <td><?php echo esc_html($phone_result['number']); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php else: ?>
+            <p>No placeholder phone numbers found.</p>
+        <?php endif;
+    }
+    
+    // New method for YouTube URLs table
+    private function render_youtube_urls_table($results) {
+        if (!empty($results['youtube_urls'])): ?>
+            <h3>YouTube URLs</h3>
+            <table class="wp-list-table widefat fixed striped">
+                <thead>
+                    <tr>
+                        <th>Post ID</th>
+                        <th>Post Title</th>
+                        <th>Post Status</th>
+                        <th>Location</th>
+                        <th>YouTube URL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($results['youtube_urls'] as $youtube_result): ?>
+                        <tr>
+                            <td>
+                                <a href="<?php echo esc_url(get_edit_post_link($youtube_result['post_id'])); ?>" 
+                                   target="_blank">
+                                    <?php echo esc_html($youtube_result['post_id']); ?>
+                                </a>
+                            </td>
+                            <td><?php echo esc_html($youtube_result['post_title']); ?></td>
+                            <td><?php echo esc_html($youtube_result['post_status']); ?></td>
+                            <td><?php echo esc_html($youtube_result['location']); ?></td>
+                            <td>
+                                <a href="<?php echo esc_url($youtube_result['url']); ?>" target="_blank">
+                                    <?php echo esc_html($youtube_result['url']); ?>
+                                </a>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php else: ?>
+            <p>No YouTube URLs found.</p>
+        <?php endif;
+    }
+    
+    // New method for placeholder images table
+    private function render_placeholder_images_table($results) {
+        if (!empty($results['placeholder_images'])): ?>
+            <h3>Images with "Placeholder" in Filename</h3>
+            <table class="wp-list-table widefat fixed striped">
+                <thead>
+                    <tr>
+                        <th>Post ID</th>
+                        <th>Post Title</th>
+                        <th>Post Status</th>
+                        <th>Location</th>
+                        <th>Image Source</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($results['placeholder_images'] as $image_result): ?>
+                        <tr>
+                            <td>
+                                <a href="<?php echo esc_url(get_edit_post_link($image_result['post_id'])); ?>" 
+                                   target="_blank">
+                                    <?php echo esc_html($image_result['post_id']); ?>
+                                </a>
+                            </td>
+                            <td><?php echo esc_html($image_result['post_title']); ?></td>
+                            <td><?php echo esc_html($image_result['post_status']); ?></td>
+                            <td><?php echo esc_html($image_result['location']); ?></td>
+                            <td>
+                                <?php echo esc_html($image_result['src']); ?>
+                                <br>
+                                <img src="<?php echo esc_url($image_result['src']); ?>" alt="Placeholder Image" style="max-width: 150px; max-height: 75px;" />
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php else: ?>
+            <p>No images with "placeholder" in filename found.</p>
         <?php endif;
     }
 }

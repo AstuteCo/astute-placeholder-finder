@@ -11,7 +11,10 @@ trait Placeholder_Content_Search {
             'posts' => array(),
             'blocks' => array(),
             'postmeta' => array(),
-            'acf' => array()
+            'acf' => array(),
+            'phone_numbers' => array(), // Added for phone numbers
+            'youtube_urls' => array(),  // Added for YouTube URLs
+            'placeholder_images' => array(), // Added for placeholder images
         );
 
         // Get all posts, excluding revisions
@@ -65,6 +68,46 @@ trait Placeholder_Content_Search {
                             'type' => 'Placeholder Link'
                         );
                     }
+                    
+                    // Search for placeholder phone numbers in block
+                    if (preg_match('/\b(\d{3}[\.\-\s]?\d{3}[\.\-\s]?\d{4}|\(\d{3}\)[\s\.\-]?\d{3}[\.\-\s]?\d{4})\b/', $block_content, $matches)) {
+                        $results['phone_numbers'][] = array(
+                            'post_id' => $post_id,
+                            'post_title' => $post_title,
+                            'post_status' => $post_status,
+                            'location' => 'Block: ' . ($block['blockName'] ?: 'Unknown Block'),
+                            'number' => $matches[0],
+                            'type' => 'Placeholder Phone Number'
+                        );
+                    }
+                    
+                    // Search for YouTube URLs in block
+                    if (preg_match_all('/(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+/', $block_content, $matches)) {
+                        foreach ($matches[0] as $youtube_url) {
+                            $results['youtube_urls'][] = array(
+                                'post_id' => $post_id,
+                                'post_title' => $post_title,
+                                'post_status' => $post_status,
+                                'location' => 'Block: ' . ($block['blockName'] ?: 'Unknown Block'),
+                                'url' => $youtube_url,
+                                'type' => 'YouTube URL'
+                            );
+                        }
+                    }
+                    
+                    // Search for images with "placeholder" in the filename
+                    if (preg_match_all('/<img[^>]+src=[\'"]([^\'"]+placeholder[^\'"]+)[\'"][^>]*>/i', $block_content, $matches)) {
+                        foreach ($matches[1] as $image_src) {
+                            $results['placeholder_images'][] = array(
+                                'post_id' => $post_id,
+                                'post_title' => $post_title,
+                                'post_status' => $post_status,
+                                'location' => 'Block: ' . ($block['blockName'] ?: 'Unknown Block'),
+                                'src' => $image_src,
+                                'type' => 'Placeholder Image'
+                            );
+                        }
+                    }
                 }
             }
 
@@ -89,6 +132,48 @@ trait Placeholder_Content_Search {
                     'type' => 'Placeholder Link',
                     'details' => 'Found placeholder link href="#"'
                 );
+            }
+            
+            // Check for placeholder phone numbers in content
+            if (preg_match_all('/\b(\d{3}[\.\-\s]?\d{3}[\.\-\s]?\d{4}|\(\d{3}\)[\s\.\-]?\d{3}[\.\-\s]?\d{4})\b/', $post_content, $matches)) {
+                foreach ($matches[0] as $phone_number) {
+                    $results['phone_numbers'][] = array(
+                        'post_id' => $post_id,
+                        'post_title' => $post_title,
+                        'post_status' => $post_status,
+                        'location' => 'Post Content',
+                        'number' => $phone_number,
+                        'type' => 'Placeholder Phone Number'
+                    );
+                }
+            }
+            
+            // Check for YouTube URLs in content
+            if (preg_match_all('/(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+/', $post_content, $matches)) {
+                foreach ($matches[0] as $youtube_url) {
+                    $results['youtube_urls'][] = array(
+                        'post_id' => $post_id,
+                        'post_title' => $post_title,
+                        'post_status' => $post_status,
+                        'location' => 'Post Content',
+                        'url' => $youtube_url,
+                        'type' => 'YouTube URL'
+                    );
+                }
+            }
+            
+            // Check for images with "placeholder" in the filename
+            if (preg_match_all('/<img[^>]+src=[\'"]([^\'"]+placeholder[^\'"]+)[\'"][^>]*>/i', $post_content, $matches)) {
+                foreach ($matches[1] as $image_src) {
+                    $results['placeholder_images'][] = array(
+                        'post_id' => $post_id,
+                        'post_title' => $post_title,
+                        'post_status' => $post_status,
+                        'location' => 'Post Content',
+                        'src' => $image_src,
+                        'type' => 'Placeholder Image'
+                    );
+                }
             }
         }
         wp_reset_postdata();
@@ -131,6 +216,48 @@ trait Placeholder_Content_Search {
                     'meta_key' => $meta['meta_key'],
                     'type' => 'Placeholder Link'
                 );
+            }
+            
+            // Check for placeholder phone numbers in meta
+            if (preg_match_all('/\b(\d{3}[\.\-\s]?\d{3}[\.\-\s]?\d{4}|\(\d{3}\)[\s\.\-]?\d{3}[\.\-\s]?\d{4})\b/', $string_value, $matches)) {
+                foreach ($matches[0] as $phone_number) {
+                    $results['phone_numbers'][] = array(
+                        'post_id' => $meta['post_id'],
+                        'post_title' => $meta['post_title'],
+                        'post_status' => $meta['post_status'],
+                        'location' => 'Meta: ' . $meta['meta_key'],
+                        'number' => $phone_number,
+                        'type' => 'Placeholder Phone Number'
+                    );
+                }
+            }
+            
+            // Check for YouTube URLs in meta
+            if (preg_match_all('/(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+/', $string_value, $matches)) {
+                foreach ($matches[0] as $youtube_url) {
+                    $results['youtube_urls'][] = array(
+                        'post_id' => $meta['post_id'],
+                        'post_title' => $meta['post_title'],
+                        'post_status' => $meta['post_status'],
+                        'location' => 'Meta: ' . $meta['meta_key'],
+                        'url' => $youtube_url,
+                        'type' => 'YouTube URL'
+                    );
+                }
+            }
+            
+            // Check for images with "placeholder" in the filename
+            if (preg_match_all('/<img[^>]+src=[\'"]([^\'"]+placeholder[^\'"]+)[\'"][^>]*>/i', $string_value, $matches)) {
+                foreach ($matches[1] as $image_src) {
+                    $results['placeholder_images'][] = array(
+                        'post_id' => $meta['post_id'],
+                        'post_title' => $meta['post_title'],
+                        'post_status' => $meta['post_status'],
+                        'location' => 'Meta: ' . $meta['meta_key'],
+                        'src' => $image_src,
+                        'type' => 'Placeholder Image'
+                    );
+                }
             }
         }
 
@@ -183,6 +310,48 @@ trait Placeholder_Content_Search {
                                 'field_name' => $field_name,
                                 'type' => 'Placeholder Link'
                             );
+                        }
+                        
+                        // Check for placeholder phone numbers in ACF fields
+                        if (preg_match_all('/\b(\d{3}[\.\-\s]?\d{3}[\.\-\s]?\d{4}|\(\d{3}\)[\s\.\-]?\d{3}[\.\-\s]?\d{4})\b/', $string_value, $matches)) {
+                            foreach ($matches[0] as $phone_number) {
+                                $results['phone_numbers'][] = array(
+                                    'post_id' => get_the_ID(),
+                                    'post_title' => get_the_title(),
+                                    'post_status' => get_post_status(),
+                                    'location' => 'ACF: ' . $field_name,
+                                    'number' => $phone_number,
+                                    'type' => 'Placeholder Phone Number'
+                                );
+                            }
+                        }
+                        
+                        // Check for YouTube URLs in ACF fields
+                        if (preg_match_all('/(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+/', $string_value, $matches)) {
+                            foreach ($matches[0] as $youtube_url) {
+                                $results['youtube_urls'][] = array(
+                                    'post_id' => get_the_ID(),
+                                    'post_title' => get_the_title(),
+                                    'post_status' => get_post_status(),
+                                    'location' => 'ACF: ' . $field_name,
+                                    'url' => $youtube_url,
+                                    'type' => 'YouTube URL'
+                                );
+                            }
+                        }
+                        
+                        // Check for images with "placeholder" in the filename
+                        if (preg_match_all('/<img[^>]+src=[\'"]([^\'"]+placeholder[^\'"]+)[\'"][^>]*>/i', $string_value, $matches)) {
+                            foreach ($matches[1] as $image_src) {
+                                $results['placeholder_images'][] = array(
+                                    'post_id' => get_the_ID(),
+                                    'post_title' => get_the_title(),
+                                    'post_status' => get_post_status(),
+                                    'location' => 'ACF: ' . $field_name,
+                                    'src' => $image_src,
+                                    'type' => 'Placeholder Image'
+                                );
+                            }
                         }
                     }
                 }
