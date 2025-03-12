@@ -60,8 +60,8 @@ trait Placeholder_Content_Search {
                 $placeholder_types['placeholder_phone'] = true;
             }
             
-            // Look for YouTube URLs 
-            if (preg_match('/(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+/', $post_content)) {
+            // Look for specific YouTube video ID: ScMzIvxBSi4
+            if (preg_match('/(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.*ScMzIvxBSi4/', $post_content)) {
                 $placeholder_types['youtube_url'] = true;
             }
             
@@ -95,7 +95,8 @@ trait Placeholder_Content_Search {
                         $placeholder_types['placeholder_phone'] = true;
                     }
                     
-                    if (preg_match('/(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+/', $block_content)) {
+                    // Look for specific YouTube video ID in blocks
+                    if (preg_match('/(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.*ScMzIvxBSi4/', $block_content)) {
                         $placeholder_types['youtube_url'] = true;
                     }
                     
@@ -130,7 +131,8 @@ trait Placeholder_Content_Search {
                             $placeholder_types['placeholder_phone'] = true;
                         }
                         
-                        if (preg_match('/(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+/', $string_value)) {
+                        // Look for specific YouTube video ID in meta
+                        if (preg_match('/(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.*ScMzIvxBSi4/', $string_value)) {
                             $placeholder_types['youtube_url'] = true;
                         }
                         
@@ -169,7 +171,8 @@ trait Placeholder_Content_Search {
                             $placeholder_types['placeholder_phone'] = true;
                         }
                         
-                        if (preg_match('/(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+/', $string_value)) {
+                        // Look for specific YouTube video ID in ACF fields
+                        if (preg_match('/(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.*ScMzIvxBSi4/', $string_value)) {
                             $placeholder_types['youtube_url'] = true;
                         }
                         

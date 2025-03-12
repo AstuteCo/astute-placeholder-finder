@@ -2,7 +2,7 @@
 /*
 Plugin Name: Astute Placeholder Finder
 Description: Comprehensive search for Lorem Ipsum text and placeholder (#) links across all content types
-Version: 1.7
+Version: 1.8
 Author: Astute Communications
 */
 
